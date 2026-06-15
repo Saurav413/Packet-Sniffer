@@ -12,6 +12,23 @@ from datetime import datetime
 from scapy.all import sniff
 from scapy.layers.inet import IP, TCP, UDP, ICMP
 
+# Single-letter codes scapy uses for TCP flags, mapped to readable names.
+TCP_FLAG_NAMES = {
+    "S": "SYN",   # start a connection
+    "A": "ACK",   # acknowledge received data
+    "F": "FIN",   # gracefully close a connection
+    "R": "RST",   # abruptly reset a connection
+    "P": "PSH",   # push buffered data to the app now
+    "U": "URG",   # urgent data present
+}
+
+
+def decode_tcp_flags(pkt):
+    """Turn a packet's TCP flags into a readable string like 'SYN,ACK'."""
+    flags = str(pkt[TCP].flags)  # e.g. "SA" for SYN+ACK
+    names = [TCP_FLAG_NAMES.get(ch, ch) for ch in flags]
+    return ",".join(names)
+
 
 def process_packet(pkt):
     """Decode one packet layer-by-layer and print a single summary line."""
@@ -26,10 +43,12 @@ def process_packet(pkt):
     length = len(pkt)
 
     # Layer 4: figure out the transport protocol and ports.
+    extra = ""
     if pkt.haslayer(TCP):
         proto = "TCP"
         sport, dport = pkt[TCP].sport, pkt[TCP].dport
         endpoints = f"{src}:{sport} -> {dst}:{dport}"
+        extra = f"[{decode_tcp_flags(pkt)}]"
     elif pkt.haslayer(UDP):
         proto = "UDP"
         sport, dport = pkt[UDP].sport, pkt[UDP].dport
@@ -41,7 +60,7 @@ def process_packet(pkt):
         proto = f"IP/{pkt[IP].proto}"
         endpoints = f"{src} -> {dst}"
 
-    print(f"[{timestamp}] {proto:<8} {endpoints:<45} len={length}")
+    print(f"[{timestamp}] {proto:<8} {endpoints:<45} len={length:<5} {extra}")
 
 
 def main():
